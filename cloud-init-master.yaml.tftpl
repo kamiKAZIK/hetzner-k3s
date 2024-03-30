@@ -1,24 +1,27 @@
 #cloud-config
 packages:
   - curl
-  - apparmor
-  - apparmor-utils
 package_update: true
 package_upgrade: true
 #runcmd:
-#  - |
-#    curl -sfL https://get.k3s.io | sh -s - server \
-#        --disable-cloud-controller \
-#        --disable metrics-server \
-#        --disable local-storage \
-#        --node-name="$(hostname -f)" \
-#        --cluster-cidr="10.244.0.0/16" \
-#        --kube-controller-manager-arg="bind-address=0.0.0.0" \
-#        --kube-proxy-arg="metrics-bind-address=0.0.0.0" \
-#        --kube-scheduler-arg="bind-address=0.0.0.0" \
-#        --kubelet-arg="cloud-provider=external" \
-#        --token="${k3s_token}" \
-#        --tls-san="$(hostname -I | awk '{print $2}')" \
-#        --flannel-iface=ens10
-#    kubectl -n kube-system create secret generic hcloud --from-literal=token=${hcloud_token} --from-literal=network=kubernetes-network
-#    kubectl apply -f https://github.com/hetznercloud/hcloud-cloud-controller-manager/releases/download/v1.19.0/ccm-networks.yaml
+  - |
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    curl -sfL https://get.k3s.io | sh -s - server \
+        --disable-cloud-controller \
+        --disable metrics-server \
+        --disable local-storage \
+        --node-name="$(hostname -f)" \
+        --tls-san="$(hostname -I | awk '{print $2}')" \
+        --cluster-cidr="10.244.0.0/16" \
+        --kube-controller-manager-arg="bind-address=0.0.0.0" \
+        --kube-proxy-arg="metrics-bind-address=0.0.0.0" \
+        --kube-scheduler-arg="bind-address=0.0.0.0" \
+        --kubelet-arg="cloud-provider=external" \
+        --flannel-iface=enp7s0 \
+        --token=${k3s_token}
+    mkdir -p $HOME/.kube
+    cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/config
+    kubectl -n kube-system create secret generic hcloud --from-literal=token=${hcloud_token} --from-literal=network=kubernetes-network
+    helm repo add hcloud https://charts.hetzner.cloud
+    helm repo update hcloud
+    helm install hccm hcloud/hcloud-cloud-controller-manager -n kube-system --set networking.enabled=true
