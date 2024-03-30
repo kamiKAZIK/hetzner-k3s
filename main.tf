@@ -11,6 +11,11 @@ provider "hcloud" {
   token = var.hcloud_token
 }
 
+locals {
+  master_count = 1
+  worker_count = 0
+}
+
 data "template_cloudinit_config" "master_init" {
   gzip          = false
   base64_encode = true
@@ -21,7 +26,6 @@ data "template_cloudinit_config" "master_init" {
     content      = templatefile(
       "cloud-init-master.yaml.tftpl",
       {
-        public_worker_ssh_key = var.public_worker_ssh_key
         hcloud_token          = var.hcloud_token
         k3s_token             = var.k3s_token
       }
@@ -39,9 +43,7 @@ data "template_cloudinit_config" "worker_init" {
     content      = templatefile(
       "cloud-init-worker.yaml.tftpl",
       {
-        private_worker_ssh_key = var.private_worker_ssh_key,
-        public_worker_ssh_key  = var.public_worker_ssh_key,
-        k3s_token              = var.k3s_token
+        k3s_token = var.k3s_token
       }
     )
   }
@@ -58,7 +60,7 @@ resource "hcloud_network_subnet" "kubernetes_network_subnet" {
   network_id   = hcloud_network.kubernetes_network.id
   type         = "cloud"
   network_zone = "eu-central"
-  ip_range     = "10.0.0.0/24"
+  ip_range     = "10.0.0.0/16"
 }
 
 resource "hcloud_placement_group" "kubernetes_placement_group" {
@@ -67,7 +69,7 @@ resource "hcloud_placement_group" "kubernetes_placement_group" {
 }
 
 resource "hcloud_server" "master_nodes" {
-  count                      = 1
+  count                      = local.master_count
   name                       = "master-node-${count.index}"
   image                      = "ubuntu-22.04"
   server_type                = "cax11"
@@ -82,7 +84,7 @@ resource "hcloud_server" "master_nodes" {
   ssh_keys                   = var.ssh_keys
   placement_group_id         = hcloud_placement_group.kubernetes_placement_group.id
   public_net {
-    ipv4_enabled = false
+    ipv4_enabled = true
     ipv6_enabled = true
   }
   network {
@@ -96,7 +98,7 @@ resource "hcloud_server" "master_nodes" {
 }
 
 resource "hcloud_server" "worker_nodes" {
-  count                      = 0
+  count                      = local.worker_count
   name                       = "worker-node-${count.index}"
   image                      = "ubuntu-22.04"
   server_type                = "cax11"
@@ -111,7 +113,7 @@ resource "hcloud_server" "worker_nodes" {
   ssh_keys                   = var.ssh_keys
   placement_group_id         = hcloud_placement_group.kubernetes_placement_group.id
   public_net {
-    ipv4_enabled = false
+    ipv4_enabled = true
     ipv6_enabled = true
   }
   network {
@@ -208,15 +210,23 @@ resource "hcloud_firewall" "kubernetes_firewall" {
 }
 
 resource "hcloud_firewall_attachment" "kubernetes_firewall_master_nodes" {
+  count = local.master_count
   firewall_id = hcloud_firewall.kubernetes_firewall.id
   server_ids  = [
-    hcloud_server.master_nodes.id
+    hcloud_server.master_nodes[count.index].id
+  ]
+  depends_on = [
+    hcloud_server.master_nodes
   ]
 }
 
 resource "hcloud_firewall_attachment" "kubernetes_firewall_worker_nodes" {
+  count = local.worker_count
   firewall_id = hcloud_firewall.kubernetes_firewall.id
   server_ids  = [
-    hcloud_server.worker_nodes.id
+    hcloud_server.worker_nodes[count.index].id
+  ]
+  depends_on = [
+    hcloud_server.worker_nodes
   ]
 }
