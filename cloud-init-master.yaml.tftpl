@@ -5,19 +5,11 @@ packages:
   - apparmor-utils
 package_update: true
 package_upgrade: true
-users:
-  - name: cluster
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    ssh-authorized-keys:
-      - ${public_worker_ssh_key}
 runcmd:
-  - # curl https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
   - |
     curl -sfL https://get.k3s.io | sh -s - server \
         --disable-cloud-controller \
         --disable metrics-server \
-        --write-kubeconfig-mode=644 \
         --disable local-storage \
         --node-name="$(hostname -f)" \
         --cluster-cidr="10.244.0.0/16" \
@@ -29,4 +21,4 @@ runcmd:
         --tls-san="$(hostname -I | awk '{print $2}')" \
         --flannel-iface=ens10
     kubectl -n kube-system create secret generic hcloud --from-literal=token=${hcloud_token} --from-literal=network=kubernetes-network
-    kubectl apply -f https://github.com/hetznercloud/hcloud-cloud-controller-manager/releases/latest/download/ccm-networks.yaml
+    kubectl apply -f https://github.com/hetznercloud/hcloud-cloud-controller-manager/releases/download/v1.19.0/ccm-networks.yaml
