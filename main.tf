@@ -26,8 +26,8 @@ data "template_cloudinit_config" "master_init" {
     content      = templatefile(
       "cloud-init-master.yaml.tftpl",
       {
-        hcloud_token          = var.hcloud_token
-        k3s_token             = var.k3s_token
+        hcloud_token = var.hcloud_token
+        k3s_token    = var.k3s_token
       }
     )
   }
@@ -51,7 +51,7 @@ data "template_cloudinit_config" "worker_init" {
 
 resource "hcloud_network" "kubernetes_network" {
   name     = "kubernetes-network"
-  ip_range = "10.0.0.0/16"
+  ip_range = "10.1.0.0/16"
   expose_routes_to_vswitch = false
   delete_protection = false
 }
@@ -60,7 +60,109 @@ resource "hcloud_network_subnet" "kubernetes_network_subnet" {
   network_id   = hcloud_network.kubernetes_network.id
   type         = "cloud"
   network_zone = "eu-central"
-  ip_range     = "10.0.0.0/16"
+  ip_range     = "10.1.0.0/16"
+}
+
+resource "hcloud_firewall" "kubernetes_firewall" {
+  name = "kubernetes-firewall"
+  rule {
+    description = "Allow SSH In"
+    direction   = "in"
+    protocol    = "tcp"
+    port        = 22
+    source_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow ICMP In"
+    direction   = "in"
+    protocol    = "icmp"
+    source_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow HTTP In"
+    direction   = "in"
+    protocol    = "tcp"
+    port        = "80"
+    source_ips  = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow HTTPS In"
+    direction   = "in"
+    protocol    = "tcp"
+    port        = "443"
+    source_ips  = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow ICMP Out"
+    direction = "out"
+    protocol  = "icmp"
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow DNS TCP Out"
+    direction = "out"
+    protocol  = "tcp"
+    port      = 53
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow DNS UDP Out"
+    direction = "out"
+    protocol  = "udp"
+    port      = 53
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow HTTP Out"
+    direction = "out"
+    protocol  = "tcp"
+    port      = 80
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow HTTPS Out"
+    direction = "out"
+    protocol  = "tcp"
+    port      = 443
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+  rule {
+    description = "Allow NTP UDP Out"
+    direction = "out"
+    protocol  = "udp"
+    port      = 123
+    destination_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
 }
 
 resource "hcloud_placement_group" "kubernetes_placement_group" {
@@ -125,88 +227,6 @@ resource "hcloud_server" "worker_nodes" {
     hcloud_placement_group.kubernetes_placement_group,
     hcloud_server.master_nodes
   ]
-}
-
-resource "hcloud_firewall" "kubernetes_firewall" {
-  name = "kubernetes-firewall"
-  rule {
-    description = "Allow SSH In"
-    direction   = "in"
-    protocol    = "tcp"
-    port        = 22
-    source_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow ICMP In"
-    direction   = "in"
-    protocol    = "icmp"
-    source_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow ICMP Out"
-    direction = "out"
-    protocol  = "icmp"
-    destination_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow DNS TCP Out"
-    direction = "out"
-    protocol  = "tcp"
-    port      = 53
-    destination_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow DNS UDP Out"
-    direction = "out"
-    protocol  = "udp"
-    port      = 53
-    destination_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow HTTP Out"
-    direction = "out"
-    protocol  = "tcp"
-    port      = 80
-    destination_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow HTTPS Out"
-    direction = "out"
-    protocol  = "tcp"
-    port      = 443
-    destination_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
-  rule {
-    description = "Allow NTP UDP Out"
-    direction = "out"
-    protocol  = "udp"
-    port      = 123
-    destination_ips = [
-      "0.0.0.0/0",
-      "::/0"
-    ]
-  }
 }
 
 resource "hcloud_firewall_attachment" "kubernetes_firewall_master_nodes" {

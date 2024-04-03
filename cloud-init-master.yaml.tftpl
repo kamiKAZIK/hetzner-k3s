@@ -1,27 +1,80 @@
 #cloud-config
 packages:
   - curl
+  - haproxy
 package_update: true
 package_upgrade: true
-#runcmd:
+runcmd:
   - |
-    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-    curl -sfL https://get.k3s.io | sh -s - server \
+    HOSTNAME=$(hostname -f)
+    PRIVATE_IP=$(ip route get 10.1.0.1 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
+    PUBLIC_IP=$(hostname -I | awk '{print $1}')
+    NETWORK_INTERFACE=$(ip route get 10.1.0.1 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}')
+    curl -fsSL -o get_helm.sh \
+        https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+    chmod 700 get_helm.sh
+    ./get_helm.sh --version v3.14.3
+    rm get_helm.sh
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.28.7+k3s1" sh -s - server \
         --disable-cloud-controller \
-        --disable metrics-server \
-        --disable local-storage \
-        --node-name="$(hostname -f)" \
-        --tls-san="$(hostname -I | awk '{print $2}')" \
+        --disable=servicelb \
+        --disable=traefik \
+        --disable=metrics-server \
+        --disable=local-storage \
+        --node-name=$HOSTNAME \
         --cluster-cidr="10.244.0.0/16" \
+        --service-cidr=10.43.0.0/16 \
+        --cluster-dns=10.43.0.10 \
+        --etcd-expose-metrics=true \
         --kube-controller-manager-arg="bind-address=0.0.0.0" \
         --kube-proxy-arg="metrics-bind-address=0.0.0.0" \
         --kube-scheduler-arg="bind-address=0.0.0.0" \
         --kubelet-arg="cloud-provider=external" \
-        --flannel-iface=enp7s0 \
+        --flannel-iface=$NETWORK_INTERFACE \
+        --advertise-address=$PRIVATE_IP \
+        --node-ip=$PRIVATE_IP \
+        --node-external-ip=$PUBLIC_IP \
         --token=${k3s_token}
     mkdir -p $HOME/.kube
     cp /etc/rancher/k3s/k3s.yaml $HOME/.kube/config
     kubectl -n kube-system create secret generic hcloud --from-literal=token=${hcloud_token} --from-literal=network=kubernetes-network
     helm repo add hcloud https://charts.hetzner.cloud
-    helm repo update hcloud
-    helm install hccm hcloud/hcloud-cloud-controller-manager -n kube-system --set networking.enabled=true
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm repo update hcloud ingress-nginx
+    helm install hccm hcloud/hcloud-cloud-controller-manager -n kube-system --set networking.enabled=true --version 1.19.0
+    helm install ingress-nginx ingress-nginx/ingress-nginx \
+        --set controller.service.type=NodePort \
+        --set controller.service.nodePorts.http=32080 \
+        --set controller.service.nodePorts.https=32443
+    cat <<EOF > /etc/haproxy/haproxy.cfg
+    global
+      daemon
+      user  haproxy
+      group  haproxy
+      log  /dev/log local0
+      maxconn  10000
+      pidfile  /var/run/haproxy.pid
+    defaults
+      log  global
+      mode  tcp
+      retries  3
+      timeout  http-request 10s
+      timeout  queue 1m
+      timeout  connect 10s
+      timeout  client 1m
+      timeout  server 1m
+      timeout  check 10s
+    frontend nodeport80
+      bind :80
+      default_backend port32080
+    frontend nodeport443
+      bind :443
+      default_backend port32443
+    backend port32080
+      balance roundrobin
+      server web1 127.0.0.1:32080
+    backend port32443
+      balance roundrobin
+      server web1 127.0.0.1:32443
+    EOF
+    service haproxy reload
