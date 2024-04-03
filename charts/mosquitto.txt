@@ -1,0 +1,24 @@
+helm repo add t3n https://storage.googleapis.com/t3n-helm-charts
+
+cat <<EOF > mosquitto-values.yaml
+image:
+  tag: 2.0.18-openssl
+service:
+  type: NodePort
+ports:
+  mqtt:
+    port: 1883
+    nodePort: 31883
+config: |
+  allow_anonymous true
+  persistence true
+  persistence_location /mosquitto/data/
+  log_dest stdout
+  listener 1883
+  listener 9090
+  protocol websockets
+EOF
+
+helm install mosquitto t3n/mosquitto --version 2.4.1 --values mosquitto-values.yaml
+
+rm mosquitto-values.yaml

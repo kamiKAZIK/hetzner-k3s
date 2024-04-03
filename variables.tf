@@ -1,3 +1,7 @@
+variable "enable_ipv4" {
+  default = true
+}
+
 variable "hcloud_token" {
   sensitive = true
 }

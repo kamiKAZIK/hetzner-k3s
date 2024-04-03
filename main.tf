@@ -186,7 +186,7 @@ resource "hcloud_server" "master_nodes" {
   ssh_keys                   = var.ssh_keys
   placement_group_id         = hcloud_placement_group.kubernetes_placement_group.id
   public_net {
-    ipv4_enabled = true
+    ipv4_enabled = var.enable_ipv4
     ipv6_enabled = true
   }
   network {
@@ -215,7 +215,7 @@ resource "hcloud_server" "worker_nodes" {
   ssh_keys                   = var.ssh_keys
   placement_group_id         = hcloud_placement_group.kubernetes_placement_group.id
   public_net {
-    ipv4_enabled = true
+    ipv4_enabled = var.enable_ipv4
     ipv6_enabled = true
   }
   network {
