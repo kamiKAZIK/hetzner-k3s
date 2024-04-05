@@ -40,11 +40,14 @@ runcmd:
     helm repo add hcloud https://charts.hetzner.cloud
     helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
     helm repo update hcloud ingress-nginx
-    helm install hccm hcloud/hcloud-cloud-controller-manager -n kube-system --set networking.enabled=true --version 1.19.0
+    helm install hccm hcloud/hcloud-cloud-controller-manager -n kube-system \
+        --set networking.enabled=true \
+        --version 1.19.0
     helm install ingress-nginx ingress-nginx/ingress-nginx \
         --set controller.service.type=NodePort \
         --set controller.service.nodePorts.http=32080 \
-        --set controller.service.nodePorts.https=32443
+        --set controller.service.nodePorts.https=32443 \
+        --version 4.10.0
     cat <<EOF > /etc/haproxy/haproxy.cfg
     global
       daemon
