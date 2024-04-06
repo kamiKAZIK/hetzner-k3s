@@ -1,0 +1,369 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-listener" (include "refinery.fullname" .) }}
+  labels: {{- include "refinery.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: listener
+    {{- with .Values.refinery.common.labels }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+    {{- with .Values.refinery.domain.server.configMap.labels }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+  {{- if or .Values.refinery.common.annotations .Values.refinery.domain.server.configMap.annotations }}
+  annotations:
+    {{- with .Values.refinery.common.annotations }}
+      {{- toYaml . | trim | nindent 4 }}
+      {{- end }}
+      {{- with .Values.refinery.domain.server.configMap.annotations }}
+      {{- toYaml . | trim | nindent 4 }}
+      {{- end }}
+  {{- end }}
+data:
+  application-override.conf: |
+    include "application.conf"
+
+    application = {
+      api = {
+        create-identity-set = {
+          timeout = {{ required ".Values.refinery.domain.server.application.api.createIdentitySet.timeout is required!" .Values.refinery.domain.server.application.api.createIdentitySet.timeout | quote }}
+        }
+        generate-weight-from-identity-set-sync = {
+          timeout = {{ required ".Values.refinery.domain.server.application.api.generateWeightFromIdentitySetSync.timeout is required!" .Values.refinery.domain.server.application.api.generateWeightFromIdentitySetSync.timeout | quote }}
+        }
+        generate-weight-from-identity-set-async = {
+          timeout = {{ required ".Values.refinery.domain.server.application.api.generateWeightFromIdentitySetAsync.timeout is required!" .Values.refinery.domain.server.application.api.generateWeightFromIdentitySetAsync.timeout | quote }}
+        }
+      }
+    }
+    pekko = {
+      discovery = {
+        kubernetes-api = {
+          {{- $selectorsContainer := dict "selectors" (list "app.kubernetes.io/component=listener") -}}
+          {{- range $key, $value := (include "refinery.labels.matchLabels" . | fromYaml) }}
+          {{- $noop := prepend $selectorsContainer.selectors (printf "%s=%s" $key $value) | set $selectorsContainer "selectors" }}
+          {{- end }}
+          pod-label-selector = {{ join "," $selectorsContainer.selectors | quote }}
+          container-name = "server"
+        }
+      }
+      management = {
+        cluster = {
+          bootstrap = {
+            contact-point-discovery = {
+              port-name = "srv-mgmt-bnd"
+              discovery-method = "kubernetes-api"
+              required-contact-point-nr = {{ required ".Values.refinery.domain.server.podDisruptionBudget.minAvailable is required!" .Values.refinery.domain.server.podDisruptionBudget.minAvailable }}
+            }
+          }
+        }
+        http = {
+          port = {{ required ".Values.refinery.domain.server.pekko.management.http.bindPort is required!" .Values.refinery.domain.server.pekko.management.http.bindPort }}
+        }
+      }
+      http = {
+        server = {
+          idle-timeout = {{ required ".Values.refinery.domain.server.pekko.http.server.idleTimeout is required!" .Values.refinery.domain.server.pekko.http.server.idleTimeout | quote }}
+          default-http-port = {{ required ".Values.refinery.domain.server.bindPort is required!" .Values.refinery.domain.server.bindPort }}
+        }
+        client = {
+          idle-timeout = {{ required ".Values.refinery.domain.server.pekko.http.client.idleTimeout is required!" .Values.refinery.domain.server.pekko.http.client.idleTimeout | quote }}
+        }
+        host-connection-pool = {
+          max-open-requests = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.maxOpenRequests is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.maxOpenRequests }}
+          max-connections = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.maxConnections is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.maxConnections }}
+          min-connections = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.minConnections is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.minConnections }}
+          max-retries = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.maxRetries is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.maxRetries }}
+          max-connection-lifetime = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.maxConnectionLifetime is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.maxConnectionLifetime | quote }}
+          base-connection-backoff = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.baseConnectionBackoff is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.baseConnectionBackoff | quote }}
+          max-connection-backoff = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.maxConnectionBackoff is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.maxConnectionBackoff | quote }}
+          idle-timeout = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.idleTimeout is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.idleTimeout | quote }}
+          response-entity-subscription-timeout = {{ required ".Values.refinery.domain.server.pekko.http.hostConnectionPool.responseEntitySubscriptionTimeout is required!" .Values.refinery.domain.server.pekko.http.hostConnectionPool.responseEntitySubscriptionTimeout | quote }}
+        }
+      }
+      projection = {
+        jdbc = {
+          dialect = {{ required ".Values.refinery.domain.server.pekko.projection.jdbc.dialect is required!" .Values.refinery.domain.server.pekko.projection.jdbc.dialect | quote }}
+        }
+      }
+    }
+    amqp = {
+      events = {
+        host = {{ required ".Values.refinery.domain.server.amqp.events.host is required!" .Values.refinery.domain.server.amqp.events.host | quote }}
+        port = {{ required ".Values.refinery.domain.server.amqp.events.port is required!" .Values.refinery.domain.server.amqp.events.port }}
+        user = ${AMQP_EVENTS_USER}
+        password = ${AMQP_EVENTS_PASSWORD}
+        virtual-host = {{ required ".Values.refinery.domain.server.amqp.events.virtualHost is required!" .Values.refinery.domain.server.amqp.events.virtualHost | quote }}
+        connection-name = {{ required ".Values.refinery.domain.server.amqp.events.connectionName is required!" .Values.refinery.domain.server.amqp.events.connectionName | quote }}
+        connection-timeout = {{ required ".Values.refinery.domain.server.amqp.events.connectionTimeout is required!" .Values.refinery.domain.server.amqp.events.connectionTimeout }}
+        {{- with .Values.refinery.domain.server.amqp.events.security }}
+        security = {
+          protocol = {{ required ".protocol is required!" .protocol | quote }}
+          key-store-password = {{ .keyStorePassword | default "changeit" | quote }}
+        }
+        {{- end }}
+        exchanges = {
+          publishing = {
+            name = {{ required ".Values.refinery.domain.server.amqp.events.exchanges.publishing.name is required!" .Values.refinery.domain.server.amqp.events.exchanges.publishing.name | quote }}
+            type = {{ required ".Values.refinery.domain.server.amqp.events.exchanges.publishing.type is required!" .Values.refinery.domain.server.amqp.events.exchanges.publishing.type | quote }}
+            durable = {{ required ".Values.refinery.domain.server.amqp.events.exchanges.publishing.durable is required!" .Values.refinery.domain.server.amqp.events.exchanges.publishing.durable }}
+            auto-delete = {{ required ".Values.refinery.domain.server.amqp.events.exchanges.publishing.autoDelete is required!" .Values.refinery.domain.server.amqp.events.exchanges.publishing.autoDelete }}
+          }
+        }
+      }
+    }
+    slick = {
+      dbs = {
+        projection = {
+          profile = {{ required ".Values.refinery.domain.server.slick.dbs.projection.profile is required!" .Values.refinery.domain.server.slick.dbs.projection.profile | quote }}
+          db = {
+            connectionPool = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.connectionPool is required!" .Values.refinery.domain.server.slick.dbs.projection.db.connectionPool | quote }}
+            poolName = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.poolName is required!" .Values.refinery.domain.server.slick.dbs.projection.db.poolName | quote }}
+            dataSourceClassName = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.dataSourceClassName is required!" .Values.refinery.domain.server.slick.dbs.projection.db.dataSourceClassName | quote }}
+            queueSize = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.queueSize is required!" .Values.refinery.domain.server.slick.dbs.projection.db.queueSize }}
+            connectionTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.connectionTimeout is required!" .Values.refinery.domain.server.slick.dbs.projection.db.connectionTimeout }}
+            validationTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.validationTimeout is required!" .Values.refinery.domain.server.slick.dbs.projection.db.validationTimeout }}
+            idleTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.idleTimeout is required!" .Values.refinery.domain.server.slick.dbs.projection.db.idleTimeout }}
+            maxLifetime = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.maxLifetime is required!" .Values.refinery.domain.server.slick.dbs.projection.db.maxLifetime }}
+            leakDetectionThreshold = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.leakDetectionThreshold is required!" .Values.refinery.domain.server.slick.dbs.projection.db.leakDetectionThreshold }}
+            keepAliveConnection = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.keepAliveConnection is required!" .Values.refinery.domain.server.slick.dbs.projection.db.keepAliveConnection }}
+            numThreads = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.numThreads is required!" .Values.refinery.domain.server.slick.dbs.projection.db.numThreads }}
+            maxConnections = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.maxConnections is required!" .Values.refinery.domain.server.slick.dbs.projection.db.maxConnections }}
+            minConnections = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.minConnections is required!" .Values.refinery.domain.server.slick.dbs.projection.db.minConnections }}
+            properties = {
+              url = {{ required ".Values.refinery.domain.server.slick.dbs.projection.db.jdbcUrl is required!" .Values.refinery.domain.server.slick.dbs.projection.db.jdbcUrl | quote }}
+              user = ${SLICK_DBS_PROJECTION_DB_USERNAME}
+              password = ${?SLICK_DBS_PROJECTION_DB_PASSWORD}
+              {{- with .Values.refinery.domain.server.slick.dbs.projection.db.region }}
+              region = {{ . | quote }}
+              {{- end }}
+              {{- with .Values.refinery.domain.server.slick.dbs.projection.db.sslMode }}
+              sslmode = {{ . | quote }}
+              {{- end }}
+              {{- with .Values.refinery.domain.server.slick.dbs.projection.db.sslRootCert }}
+              sslrootcert = {{ . | quote }}
+              {{- end }}
+            }
+          }
+        }
+        query = {
+          profile = {{ required ".Values.refinery.domain.server.slick.dbs.query.profile is required!" .Values.refinery.domain.server.slick.dbs.query.profile | quote }}
+          db = {
+            connectionPool = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.connectionPool is required!" .Values.refinery.domain.server.slick.dbs.query.db.connectionPool | quote }}
+            poolName = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.poolName is required!" .Values.refinery.domain.server.slick.dbs.query.db.poolName | quote }}
+            dataSourceClassName = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.dataSourceClassName is required!" .Values.refinery.domain.server.slick.dbs.query.db.dataSourceClassName | quote }}
+            queueSize = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.queueSize is required!" .Values.refinery.domain.server.slick.dbs.query.db.queueSize }}
+            connectionTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.connectionTimeout is required!" .Values.refinery.domain.server.slick.dbs.query.db.connectionTimeout }}
+            validationTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.validationTimeout is required!" .Values.refinery.domain.server.slick.dbs.query.db.validationTimeout }}
+            idleTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.idleTimeout is required!" .Values.refinery.domain.server.slick.dbs.query.db.idleTimeout }}
+            maxLifetime = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.maxLifetime is required!" .Values.refinery.domain.server.slick.dbs.query.db.maxLifetime }}
+            leakDetectionThreshold = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.leakDetectionThreshold is required!" .Values.refinery.domain.server.slick.dbs.query.db.leakDetectionThreshold }}
+            keepAliveConnection = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.keepAliveConnection is required!" .Values.refinery.domain.server.slick.dbs.query.db.keepAliveConnection }}
+            numThreads = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.numThreads is required!" .Values.refinery.domain.server.slick.dbs.query.db.numThreads }}
+            maxConnections = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.maxConnections is required!" .Values.refinery.domain.server.slick.dbs.query.db.maxConnections }}
+            minConnections = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.minConnections is required!" .Values.refinery.domain.server.slick.dbs.query.db.minConnections }}
+            properties = {
+              url = {{ required ".Values.refinery.domain.server.slick.dbs.query.db.jdbcUrl is required!" .Values.refinery.domain.server.slick.dbs.query.db.jdbcUrl | quote }}
+              user = ${SLICK_DBS_QUERY_DB_USERNAME}
+              password = ${?SLICK_DBS_QUERY_DB_PASSWORD}
+              {{- with .Values.refinery.domain.server.slick.dbs.query.db.region }}
+              region = {{ . | quote }}
+              {{- end }}
+              {{- with .Values.refinery.domain.server.slick.dbs.query.db.sslMode }}
+              sslmode = {{ . | quote }}
+              {{- end }}
+              {{- with .Values.refinery.domain.server.slick.dbs.query.db.sslRootCert }}
+              sslrootcert = {{ . | quote }}
+              {{- end }}
+            }
+          }
+        }
+        persistence = {
+          profile = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.profile is required!" .Values.refinery.domain.server.slick.dbs.persistence.profile | quote }}
+          db = {
+            connectionPool = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.connectionPool is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.connectionPool | quote }}
+            poolName = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.poolName is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.poolName | quote }}
+            dataSourceClassName = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.dataSourceClassName is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.dataSourceClassName | quote }}
+            queueSize = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.queueSize is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.queueSize }}
+            connectionTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.connectionTimeout is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.connectionTimeout }}
+            validationTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.validationTimeout is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.validationTimeout }}
+            idleTimeout = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.idleTimeout is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.idleTimeout }}
+            maxLifetime = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.maxLifetime is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.maxLifetime }}
+            leakDetectionThreshold = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.leakDetectionThreshold is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.leakDetectionThreshold }}
+            keepAliveConnection = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.keepAliveConnection is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.keepAliveConnection }}
+            numThreads = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.numThreads is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.numThreads }}
+            maxConnections = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.maxConnections is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.maxConnections }}
+            minConnections = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.minConnections is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.minConnections }}
+            properties = {
+              url = {{ required ".Values.refinery.domain.server.slick.dbs.persistence.db.jdbcUrl is required!" .Values.refinery.domain.server.slick.dbs.persistence.db.jdbcUrl | quote }}
+              user = ${SLICK_DBS_PERSISTENCE_DB_USERNAME}
+              password = ${?SLICK_DBS_PERSISTENCE_DB_PASSWORD}
+              {{- with .Values.refinery.domain.server.slick.dbs.persistence.db.region }}
+              region = {{ . | quote }}
+              {{- end }}
+              {{- with .Values.refinery.domain.server.slick.dbs.persistence.db.sslMode }}
+              sslmode = {{ . | quote }}
+              {{- end }}
+              {{- with .Values.refinery.domain.server.slick.dbs.persistence.db.sslRootCert }}
+              sslrootcert = {{ . | quote }}
+              {{- end }}
+            }
+          }
+        }
+      }
+    }
+    identity-set-generator-client = {
+      host = {{ required ".Values.refinery.domain.server.identitySetGeneratorClient.host is required!" .Values.refinery.domain.server.identitySetGeneratorClient.host | quote }}
+      port = {{ required ".Values.refinery.domain.server.identitySetGeneratorClient.port is required!" .Values.refinery.domain.server.identitySetGeneratorClient.port }}
+      secure = {{ required ".Values.refinery.domain.server.identitySetGeneratorClient.secure is required!" .Values.refinery.domain.server.identitySetGeneratorClient.secure }}
+    }
+    okta-authentication = {
+      authenticator = {
+        scheme = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.scheme is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.scheme | quote }}
+        host = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.host is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.host | quote }}
+        port = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.port is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.port }}
+        server = ${OKTA_SERVER}
+        client-id = ${OKTA_CLIENT_ID}
+        code-challenge = ${OKTA_CODE_CHALLENGE}
+        code-verifier = ${OKTA_CODE_VERIFIER}
+        retry-settings = {
+          max-retries = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.maxRetries is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.maxRetries }}
+          min-backoff = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.minBackoff is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.minBackoff | quote }}
+          max-backoff = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.maxBackoff is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.maxBackoff | quote }}
+          random-factor = {{ required ".Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.randomFactor is required!" .Values.refinery.domain.server.oktaAuthentication.authenticator.retrySettings.randomFactor }}
+        }
+      }
+      credentials = {
+        username = ${OKTA_USERNAME}
+        password = ${OKTA_PASSWORD}
+      }
+    }
+    synchronization-sources = [
+      {{- range (required ".Values.refinery.domain.server.synchronizationSources is required!" .Values.refinery.domain.server.synchronizationSources) }}
+      {
+        name-prefix = {{ required ".namePrefix is required!" .namePrefix | quote }}
+        coverage = {
+          type = {{ required ".coverage.type is required!" .coverage.type | quote }}
+          scopes = [
+            {{- range (required ".coverage.scopes is required!" .coverage.scopes) }}
+            {{ . | quote }},
+            {{- end }}
+          ]
+        },
+        config-key = {{ required ".configKey is required!" .configKey | quote }}
+      },
+      {{- end }}
+    ]
+    media-spark-api-client = {
+      {{- range $configKey, $configValue := (required ".Values.refinery.domain.server.mediaSparkApiClient is required!" .Values.refinery.domain.server.mediaSparkApiClient) }}
+      {{ $configKey }} = {
+        scheme = {{ required ".scheme is required!" $configValue.scheme | quote }}
+        host = {{ required ".host is required!" $configValue.host | quote }}
+        port = {{ required ".port is required!" $configValue.port }}
+        kpi = {
+          timeout = {{ required ".kpi.timeout is required!" $configValue.kpi.timeout }}
+        }
+        retry-settings = {
+          max-retries = {{ required ".retrySettings.maxRetries is required!" $configValue.retrySettings.maxRetries }}
+          min-backoff = {{ required ".retrySettings.minBackoff is required!" $configValue.retrySettings.minBackoff | quote }}
+          max-backoff = {{ required ".retrySettings.maxBackoff is required!" $configValue.retrySettings.maxBackoff | quote }}
+          random-factor = {{ required ".retrySettings.randomFactor is required!" $configValue.retrySettings.randomFactor }}
+        }
+      }
+      {{- end }}
+    }
+    entitlements = {
+      tenant = {
+        default-id = {{ required ".Values.refinery.domain.server.entitlements.tenant.defaultId is required!" .Values.refinery.domain.server.entitlements.tenant.defaultId }}
+        test-user = {
+          name = {{ required ".Values.refinery.domain.server.entitlements.tenant.testUser.name is required!" .Values.refinery.domain.server.entitlements.tenant.testUser.name | quote }}
+          tenant-id = {{ required ".Values.refinery.domain.server.entitlements.tenant.testUser.tenantId is required!" .Values.refinery.domain.server.entitlements.tenant.testUser.tenantId }}
+        }
+      }
+      pdp-api = {
+        scheme = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.scheme is required!" .Values.refinery.domain.server.entitlements.pdpApi.scheme | quote }}
+        host = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.host is required!" .Values.refinery.domain.server.entitlements.pdpApi.host | quote }}
+        port = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.port is required!" .Values.refinery.domain.server.entitlements.pdpApi.port }}
+        authorization-path = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.authorizationPath is required!" .Values.refinery.domain.server.entitlements.pdpApi.authorizationPath | quote }}
+        authorization-header = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.authorizationHeader is required!" .Values.refinery.domain.server.entitlements.pdpApi.authorizationHeader | quote }}
+        retry-settings = {
+          max-retries = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.retrySettings.maxRetries is required!" .Values.refinery.domain.server.entitlements.pdpApi.retrySettings.maxRetries }}
+          min-backoff = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.retrySettings.minBackoff is required!" .Values.refinery.domain.server.entitlements.pdpApi.retrySettings.minBackoff | quote }}
+          max-backoff = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.retrySettings.maxBackoff is required!" .Values.refinery.domain.server.entitlements.pdpApi.retrySettings.maxBackoff | quote }}
+          random-factor = {{ required ".Values.refinery.domain.server.entitlements.pdpApi.retrySettings.randomFactor is required!" .Values.refinery.domain.server.entitlements.pdpApi.retrySettings.randomFactor }}
+        }
+      }
+      jwt = {
+        cache-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.cacheEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.cacheEnabled }}
+        maf = {
+          public-keys = [
+            {{- range $publicKey := (required ".Values.refinery.domain.server.entitlements.jwt.maf.publicKeys is required!" .Values.refinery.domain.server.entitlements.jwt.maf.publicKeys) }}
+            {{ $publicKey | b64enc | quote }},
+            {{- end }}
+          ]
+          signature-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.maf.signatureEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.maf.signatureEnabled }}
+          expiration-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.maf.expirationEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.maf.expirationEnabled }}
+          not-before-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.maf.notBeforeEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.maf.notBeforeEnabled }}
+          leeway = {{ required ".Values.refinery.domain.server.entitlements.jwt.maf.leeway is required!" .Values.refinery.domain.server.entitlements.jwt.maf.leeway }}
+        }
+        okta = {
+          domain = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.domain is required!" .Values.refinery.domain.server.entitlements.jwt.okta.domain | quote }}
+          server-id = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.serverId is required!" .Values.refinery.domain.server.entitlements.jwt.okta.serverId | quote }}
+          audience = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.audience is required!" .Values.refinery.domain.server.entitlements.jwt.okta.audience | quote }}
+          timeout = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.timeout is required!" .Values.refinery.domain.server.entitlements.jwt.okta.timeout | quote }}
+          retry-max-attempts = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.retryMaxAttempts is required!" .Values.refinery.domain.server.entitlements.jwt.okta.retryMaxAttempts }}
+          retry-max-elapsed-time = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.retryMaxElapsedTime is required!" .Values.refinery.domain.server.entitlements.jwt.okta.retryMaxElapsedTime | quote }}
+          leeway = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.leeway is required!" .Values.refinery.domain.server.entitlements.jwt.okta.leeway }}
+          enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.okta.enabled is required!" .Values.refinery.domain.server.entitlements.jwt.okta.enabled }}
+        }
+        fake = {
+          signature-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.fake.signatureEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.fake.signatureEnabled }}
+          expiration-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.fake.expirationEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.fake.expirationEnabled }}
+          not-before-enabled = {{ required ".Values.refinery.domain.server.entitlements.jwt.fake.notBeforeEnabled is required!" .Values.refinery.domain.server.entitlements.jwt.fake.notBeforeEnabled }}
+          leeway = {{ required ".Values.refinery.domain.server.entitlements.jwt.fake.leeway is required!" .Values.refinery.domain.server.entitlements.jwt.fake.leeway }}
+        }
+      }
+    }
+    tracing = {
+      service-name = {{ printf "%s-%s" (include "refinery.fullname" .) .Release.Namespace | quote }}
+      endpoint = {{ required ".Values.refinery.domain.server.tracing.endpoint is required!" .Values.refinery.domain.server.tracing.endpoint | quote }}
+      health = {
+        enabled = {{ required ".Values.refinery.domain.server.tracing.health.enabled is required!" .Values.refinery.domain.server.tracing.health.enabled }}
+      }
+      api = {
+        enabled = {{ required ".Values.refinery.domain.server.tracing.api.enabled is required!" .Values.refinery.domain.server.tracing.api.enabled }}
+      }
+    }
+    elastic-logger = {
+      enabled = {{ required ".Values.refinery.domain.server.elasticLogger.enabled is required!" .Values.refinery.domain.server.elasticLogger.enabled }}
+      tracing-type = {{ printf "n1p-%s" (include "refinery.fullname" .) | quote }}
+      level = {{ required ".Values.refinery.domain.server.elasticLogger.level is required!" .Values.refinery.domain.server.elasticLogger.level | quote }}
+    }
+  logback.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <configuration>
+      <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+          <timestampPattern>yyyy-MM-dd HH:mm:ss,SSS</timestampPattern>
+          <includeMdcKeyName>pekkoSource</includeMdcKeyName>
+          <includeMdcKeyName>pekkoAddress</includeMdcKeyName>
+          <fieldNames>
+            <timestamp>date</timestamp>
+            <level>level</level>
+            <logger>logger</logger>
+            <thread>thread</thread>
+            <stackTrace>stack_trace</stackTrace>
+            <version>version</version>
+          </fieldNames>
+        </encoder>
+      </appender>
+      <appender name="ASYNC_STDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="STDOUT" />
+      </appender>
+      {{- range .Values.refinery.domain.server.logback.loggers }}
+      <logger name="{{ required ".name is required!" .name | trim }}" level="{{ required ".level is required!" .level | trim }}" />
+      {{- end }}
+      <root level="{{ required ".Values.refinery.domain.server.logback.rootLevel is required!" .Values.refinery.domain.server.logback.rootLevel | trim }}">
+        <appender-ref ref="ASYNC_STDOUT" />
+      </root>
+    </configuration>
