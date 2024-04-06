@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "mosquitto.fullname" . }}
+  labels: {{- include "mosquitto.labels.standard" . | nindent 4 }}
+    {{- with .Values.mosquitto.common.labels }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+    {{- with .Values.mosquitto.deployment.labels }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+  {{- if or .Values.mosquitto.common.annotations .Values.mosquitto.deployment.annotations }}
+  annotations:
+    {{- with .Values.mosquitto.common.annotations }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+    {{- with .Values.mosquitto.deployment.annotations }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  replicas: {{ required ".Values.mosquitto.deployment.replicas is required!" .Values.mosquitto.deployment.replicas }}
+  {{- with .Values.mosquitto.deployment.strategy }}
+  strategy: {{- toYaml . | trim | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "mosquitto.labels.matchLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "mosquitto.labels.standard" . | nindent 8 }}
+        {{- with .Values.mosquitto.common.labels }}
+        {{- toYaml . | trim | nindent 8 }}
+        {{- end }}
+        {{- with .Values.mosquitto.pod.labels }}
+        {{- toYaml . | trim | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/mosquitto-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/mosquitto-secret.yaml") . | sha256sum }}
+        {{- with .Values.mosquitto.imageDigest }}
+        imageDigest/broker: {{ . }}
+        {{- end }}
+        {{- with .Values.mosquitto.common.annotations }}
+        {{- toYaml . | trim | nindent 8 }}
+        {{- end }}
+        {{- with .Values.mosquitto.pod.annotations }}
+        {{- toYaml . | trim | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.mosquitto.pod.nodeSelector }}
+      nodeSelector: {{- toYaml . | trim | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ if .Values.mosquitto.rbac.create }}{{ template "mosquitto.fullname" . }}{{ else }}{{ required ".Values.mosquitto.serviceAccount.existing is required!" .Values.mosquitto.serviceAccount.existing }}{{ end }}
+      {{- with .Values.mosquitto.pod.tolerations }}
+      tolerations: {{- toYaml . | trim | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mosquitto.pod.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: mosquitto
+          {{- if .Values.mosquitto.imageDigest }}
+          image: {{ printf "%s@%s" (required ".Values.mosquitto.image is required!" .Values.mosquitto.image) .Values.mosquitto.imageDigest }}
+          {{- else }}
+          image: {{ printf "%s:%s" (required ".Values.mosquitto.image is required!" .Values.mosquitto.image) (required ".Values.mosquitto.imageTag is required!" .Values.mosquitto.imageTag) }}
+          {{- end }}
+          imagePullPolicy: {{ required ".Values.mosquitto.imagePullPolicy is required!" .Values.mosquitto.imagePullPolicy }}
+          ports:
+  mqtt:
+    port: 1883
+    # sets consistent nodePort, required to set service.type=NodePort
+    # nodePort: 31883
+    protocol: TCP
+  websocket:
+    port: 9090
+    protocol: TCP
+            - name: mqtt
+              containerPort: {{ required ".Values.mosquitto.mqttPort is required!" .Values.mosquitto.mqttPort }}
+          {{- with .Values.mosquitto.livenessProbe }}
+          livenessProbe: {{- toYaml . | trim | nindent 12 }}
+          {{- end }}
+          {{- with .Values.mosquitto.readinessProbe }}
+          readinessProbe: {{- toYaml .| trim | nindent 12 }}
+          {{- end }}
+          {{- with .Values.mosquitto.resources }}
+          resources: {{- toYaml . | trim | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: broker-config
+              mountPath: {{ required ".Values.mosquitto.configurationDirectory is required!" .Values.mosquitto.configurationDirectory }}
+            {{- with .Values.mosquitto.volumeMounts }}
+            {{- toYaml . | trim | nindent 12 }}
+            {{- end }}
+      securityContext:
+        fsGroup: {{ required ".Values.mosquitto.pod.securityContext.fsGroup is required!" .Values.mosquitto.pod.securityContext.fsGroup }}
+      {{- with .Values.mosquitto.pod.affinities }}
+      affinity: {{- toYaml . | trim | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: broker-config
+          configMap:
+            name: {{ printf "%s-broker" (include "mosquitto.fullname" .) }}
+        {{- with .Values.mosquitto.pod.volumes }}
+        {{- toYaml . | trim | nindent 8 }}
+        {{- end }}

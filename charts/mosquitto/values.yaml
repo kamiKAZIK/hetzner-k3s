@@ -135,198 +135,243 @@ mosquitto:
     ##
     annotations: {}
 
-  ## Broker configuration, which is specific to Mosquitto application component
+  ## Mosquitto config file contents
   ##
-  broker:
-    ## Deployment configuration
+  configFile:
+
+  ## Mosquitto authentication settings
+  ##
+  authentication:
+    ## Mosquitto password file contents
+    ## To use authentication with mosquitto, you can set a list of password entries to be used.
+    ## reference https://mosquitto.org/man/mosquitto_passwd-1.html to generate these entries.
     ##
-    deployment:
-      ## Number of replicas.
-      ##
-      replicas: 1
-
-      ## Labels to be added to the deployment.
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-      ##
-      labels: {}
-
-      ## Annotations for the deployment.
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-      ##
-      annotations: {}
-
-      ## Strategy for deployment updates.
-      ##
-      ## Example:
-      ##
-      ##   strategy:
-      ##     type: RollingUpdate
-      ##     rollingUpdate:
-      ##       maxSurge: 1
-      ##       maxUnavailable: 25%
-      strategy: {}
-
-    ## Pod(s) configuration
+    ## Example:
+    ##   passwordEntries: |-
+    ##     user1:$6$BKzw0RKerxV4Esbj$Uz5slWGB1TiOtYIEokEl0eR1YSEQAdKpcdRYMsLYbwjktlVzdLyGk41YCPGyMLnBePtdwPhkcm8kjGI0R9s57w==
     ##
-    pod:
-      ## Labels to be added to the pod(s).
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-      ##
-      labels: {}
+    passwordFile:
 
-      ## Annotations for the pod(s).
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-      ##
-      annotations: {}
-
-      ## Node selector for pod(s).
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-      ##
-      nodeSelector: {}
-
-      ## Tolerations for the pod(s).
-      ##
-      ## Example:
-      ##   - key: "toleration=key"
-      ##     operator: "Equal"
-      ##     value: "value"
-      ##     effect: "NoSchedule"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-      ##
-      tolerations: {}
-
-      ## Array of imagePullSecrets to allow pulling the Identity Set Management image from private registries.
-      ## ps.: secrets must be manually created in the namespace.
-      ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-      ##
-      ## Example:
-      ##
-      ##   imagePullSecrets:
-      ##    - myRegistryKeySecretName
-      ##
-      imagePullSecrets:
-
-      ## Security context configuration for pod(s)
-      ##
-      securityContext:
-        ## File System group ID
-        ##
-        fsGroup: 999
-
-      ## Affinities to add to the pod(s).
-      ##
-      ## Example:
-      ##   nodeAffinity:
-      ##     preferredDuringSchedulingIgnoredDuringExecution:
-      ##       - weight: 50
-      ##         preference:
-      ##           matchExpressions:
-      ##             - key: spot
-      ##               operator: NotIn
-      ##               values:
-      ##                 - "true"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
-      ##
-      affinities: {}
-
-      ## Configure volumes for the pod(s).
-      ##
-      ## Example:
-      ##
-      ##   - name: some-volume
-      ##     configMap:
-      ##       name: some-config
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/storage/volumes/
-      ##
-      volumes: {}
-
-    ## Pod distribution budget configuration for pod(s)
+    ## Location of password file
     ##
-    podDisruptionBudget:
-      ## Labels to be added to the pod disruption budget.
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-      ##
-      labels: {}
+    passwordFilePath: /etc/mosquitto/password-file
 
-      ## Annotations for the pod disruption budget.
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-      ##
-      annotations: {}
-
-      ## Minimum available pods. This can be either a number or percentage value
-      ##
-      minAvailable: 0
-
-    ## Configmap settings.
+  ## Mosquitto authorization settings
+  ##
+  authorization:
+    ## Mosquitto ACL file contents
+    ## To use authorizations with mosquitto, you can set a list of per user or pattern-based rules.
+    ## reference https://mosquitto.org/man/mosquitto-conf-5.html for further information.
     ##
-    configMap:
-      ## Labels to be added to the config map.
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
-      ##
-      labels: {}
-
-      ## Annotations for the config map.
-      ##
-      ## Example:
-      ##   key1: "value1"
-      ##   key2: "value2"
-      ##
-      ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
-      ##
-      annotations: {}
-
-    ## Mosquitto image to use in api server container(s).
+    ## Example:
+    ##   aclFile: |-
+    ##     pattern read cmnd/%u/#
+    ##     pattern write stat/%u/#
+    ##     pattern write tele/%u/#
     ##
-    image: mosquitto
+    aclFile:
 
-    ## Identity Set Management image tag.
+    ## Location of ACL file
     ##
-    imageTag:
+    aclFilePath: /etc/mosquitto/acl-file
 
-    ## Specific image digest to use in place of a tag.
-    ## Ref: https://kubernetes.io/docs/concepts/configuration/overview/#container-images
+  ## Deployment configuration
+  ##
+  deployment:
+    ## Number of replicas.
     ##
-    imageDigest:
+    replicas: 1
 
-    ## Specify a imagePullPolicy regarding the fetching of container images.
-    ## Ref: https://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+    ## Labels to be added to the deployment.
     ##
-    imagePullPolicy: IfNotPresent
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    ##
+    labels: {}
+
+    ## Annotations for the deployment.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+    ##
+    annotations: {}
+
+    ## Strategy for deployment updates.
+    ##
+    ## Example:
+    ##
+    ##   strategy:
+    ##     type: RollingUpdate
+    ##     rollingUpdate:
+    ##       maxSurge: 1
+    ##       maxUnavailable: 25%
+    strategy: {}
+
+  ## Pod(s) configuration
+  ##
+  pod:
+    ## Labels to be added to the pod(s).
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    ##
+    labels: {}
+
+    ## Annotations for the pod(s).
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+    ##
+    annotations: {}
+
+    ## Node selector for pod(s).
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    ##
+    nodeSelector: {}
+
+    ## Tolerations for the pod(s).
+    ##
+    ## Example:
+    ##   - key: "toleration=key"
+    ##     operator: "Equal"
+    ##     value: "value"
+    ##     effect: "NoSchedule"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+    ##
+    tolerations: {}
+
+    ## Array of imagePullSecrets to allow pulling the Identity Set Management image from private registries.
+    ## ps.: secrets must be manually created in the namespace.
+    ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    ##
+    ## Example:
+    ##
+    ##   imagePullSecrets:
+    ##    - myRegistryKeySecretName
+    ##
+    imagePullSecrets:
+
+    ## Affinities to add to the pod(s).
+    ##
+    ## Example:
+    ##   nodeAffinity:
+    ##     preferredDuringSchedulingIgnoredDuringExecution:
+    ##       - weight: 50
+    ##         preference:
+    ##           matchExpressions:
+    ##             - key: spot
+    ##               operator: NotIn
+    ##               values:
+    ##                 - "true"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+    ##
+    affinities: {}
+
+    ## Configure volumes for the pod(s).
+    ##
+    ## Example:
+    ##
+    ##   - name: some-volume
+    ##     configMap:
+    ##       name: some-config
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/storage/volumes/
+    ##
+    volumes: {}
+
+  ## Pod distribution budget configuration for pod(s)
+  ##
+  podDisruptionBudget:
+    ## Labels to be added to the pod disruption budget.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    ##
+    labels: {}
+
+    ## Annotations for the pod disruption budget.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+    ##
+    annotations: {}
+
+    ## Minimum available pods. This can be either a number or percentage value
+    ##
+    minAvailable: 0
+
+  ## Configmap settings.
+  ##
+  configMap:
+    ## Labels to be added to the config map.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    ##
+    labels: {}
+
+    ## Annotations for the config map.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+    ##
+    annotations: {}
+
+  ## Mosquitto image to use in api server container(s).
+  ##
+  image: mosquitto
+
+  ## Identity Set Management image tag.
+  ##
+  imageTag: 2.0.18-openssl
+
+  ## Specific image digest to use in place of a tag.
+  ## Ref: https://kubernetes.io/docs/concepts/configuration/overview/#container-images
+  ##
+  imageDigest:
+
+  ## Specify a imagePullPolicy regarding the fetching of container images.
+  ## Ref: https://kubernetes.io/docs/user-guide/images/#pre-pulling-images
+  ##
+  imagePullPolicy: IfNotPresent
+
+  ## Mosquitto container ports
+  ##
+  ports:
+    ## MQTT port
+    ##
+    - port: 1883
+      name: mqtt
+      protocol: TCP
+
+    ## WebSocket port
+    ##
+    - port: 9090
+      name: websocket
+      protocol: TCP

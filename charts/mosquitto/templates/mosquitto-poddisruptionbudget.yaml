@@ -1,26 +1,24 @@
 apiVersion: {{ include "mosquitto.capabilities.podDisruptionBudget.apiVersion" . }}
 kind: PodDisruptionBudget
 metadata:
-  name: {{ printf "%s-broker" (include "mosquitto.fullname" .) }}
+  name: {{ template "mosquitto.fullname" . }}
   labels: {{- include "mosquitto.labels.standard" . | nindent 4 }}
-    app.kubernetes.io/component: broker
     {{- with .Values.mosquitto.common.labels }}
     {{- toYaml . | trim | nindent 4 }}
     {{- end }}
-    {{- with .Values.mosquitto.broker.podDisruptionBudget.labels }}
+    {{- with .Values.mosquitto.podDisruptionBudget.labels }}
     {{- toYaml . | trim | nindent 4 }}
     {{- end }}
-  {{- if or .Values.mosquitto.common.annotations .Values.mosquitto.broker.podDisruptionBudget.annotations }}
+  {{- if or .Values.mosquitto.common.annotations .Values.mosquitto.podDisruptionBudget.annotations }}
   annotations:
     {{- with .Values.mosquitto.common.annotations }}
       {{- toYaml . | trim | nindent 4 }}
       {{- end }}
-      {{- with .Values.mosquitto.broker.podDisruptionBudget.annotations }}
+      {{- with .Values.mosquitto.podDisruptionBudget.annotations }}
       {{- toYaml . | trim | nindent 4 }}
       {{- end }}
   {{- end }}
 spec:
-  minAvailable: {{ required ".Values.mosquitto.broker.podDisruptionBudget.minAvailable is required!" .Values.broker.listener.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ required ".Values.mosquitto.podDisruptionBudget.minAvailable is required!" .Values.mosquitto.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels: {{- include "mosquitto.labels.matchLabels" . | nindent 6 }}
-      app.kubernetes.io/component: broker
