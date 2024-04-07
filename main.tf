@@ -216,7 +216,7 @@ resource "hcloud_server" "worker_nodes" {
   network {
     network_id = hcloud_network.kubernetes_network.id
   }
-  user_data = data.template_cloudinit_config.master_init.rendered
+  user_data = data.template_cloudinit_config.worker_init.rendered
   depends_on = [
     hcloud_network_subnet.kubernetes_network_subnet,
     hcloud_placement_group.kubernetes_placement_group,
