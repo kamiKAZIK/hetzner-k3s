@@ -11,7 +11,7 @@ provider "hcloud" {
   token = var.hcloud_token
 }
 
-data "cloudinit_config" "master_init" {
+data "template_cloudinit_config" "master_init" {
   gzip          = false
   base64_encode = true
 
@@ -28,7 +28,7 @@ data "cloudinit_config" "master_init" {
   }
 }
 
-data "cloudinit_config" "worker_init" {
+data "template_cloudinit_config" "worker_init" {
   gzip          = false
   base64_encode = true
 
@@ -187,7 +187,7 @@ resource "hcloud_server" "master_nodes" {
   network {
     network_id = hcloud_network.kubernetes_network.id
   }
-  user_data = data.template_cloudinit_config.master_init.content
+  user_data = data.template_cloudinit_config.master_init.rendered
   depends_on = [
     hcloud_network_subnet.kubernetes_network_subnet,
     hcloud_placement_group.kubernetes_placement_group
@@ -216,7 +216,7 @@ resource "hcloud_server" "worker_nodes" {
   network {
     network_id = hcloud_network.kubernetes_network.id
   }
-  user_data = data.template_cloudinit_config.master_init.content
+  user_data = data.template_cloudinit_config.master_init.rendered
   depends_on = [
     hcloud_network_subnet.kubernetes_network_subnet,
     hcloud_placement_group.kubernetes_placement_group,
@@ -225,7 +225,7 @@ resource "hcloud_server" "worker_nodes" {
 }
 
 resource "hcloud_firewall_attachment" "kubernetes_firewall_master_nodes" {
-  count = local.master_count
+  count = var.master_count
   firewall_id = hcloud_firewall.kubernetes_firewall.id
   server_ids  = [
     hcloud_server.master_nodes[count.index].id
@@ -236,7 +236,7 @@ resource "hcloud_firewall_attachment" "kubernetes_firewall_master_nodes" {
 }
 
 resource "hcloud_firewall_attachment" "kubernetes_firewall_worker_nodes" {
-  count = local.worker_count
+  count = var.worker_count
   firewall_id = hcloud_firewall.kubernetes_firewall.id
   server_ids  = [
     hcloud_server.worker_nodes[count.index].id
