@@ -35,8 +35,8 @@ spec:
         {{- toYaml . | trim | nindent 8 }}
         {{- end }}
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/mosquitto-configmap.yaml") . | sha256sum }}
-        checksum/secret: {{ include (print $.Template.BasePath "/mosquitto-secret.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- with .Values.mosquitto.imageDigest }}
         imageDigest/broker: {{ . }}
         {{- end }}
@@ -69,16 +69,15 @@ spec:
           {{- end }}
           imagePullPolicy: {{ required ".Values.mosquitto.imagePullPolicy is required!" .Values.mosquitto.imagePullPolicy }}
           ports:
-  mqtt:
-    port: 1883
-    # sets consistent nodePort, required to set service.type=NodePort
-    # nodePort: 31883
-    protocol: TCP
-  websocket:
-    port: 9090
-    protocol: TCP
             - name: mqtt
-              containerPort: {{ required ".Values.mosquitto.mqttPort is required!" .Values.mosquitto.mqttPort }}
+              containerPort: {{ required ".Values.mosquitto.ports.mqtt is required!" .Values.mosquitto.ports.mqtt }}
+              protocol: TCP
+            - name: mqtts
+              containerPort: {{ required ".Values.mosquitto.ports.mqtts is required!" .Values.mosquitto.ports.mqtts }}
+              protocol: TCP
+            - name: websocket
+              containerPort: {{ required ".Values.mosquitto.ports.websocket is required!" .Values.mosquitto.ports.websocket }}
+              protocol: TCP
           {{- with .Values.mosquitto.livenessProbe }}
           livenessProbe: {{- toYaml . | trim | nindent 12 }}
           {{- end }}
@@ -89,8 +88,17 @@ spec:
           resources: {{- toYaml . | trim | nindent 12 }}
           {{- end }}
           volumeMounts:
-            - name: broker-config
-              mountPath: {{ required ".Values.mosquitto.configurationDirectory is required!" .Values.mosquitto.configurationDirectory }}
+            - name: config
+              mountPath: /mosquitto/config/mosquitto.conf
+            - name: data
+              mountPath: {{ .Values.mosquitto.persistence.mountPath }}
+            {{- if and .Values.mosquitto.authentication.passwordFile }}
+            - name: password-file
+              mountPath: {{ required ".Values.mosquitto.authentication.passwordFilePath is required!" .Values.authentication.mosquitto.passwordFilePath }}
+            {{- end }}
+            {{- if and .Values.authorization.aclFile .Values.authorization.aclfilePath }}
+            - name: aclfile
+              mountPath: {{ .Values.authorization.aclfilePath }}
             {{- with .Values.mosquitto.volumeMounts }}
             {{- toYaml . | trim | nindent 12 }}
             {{- end }}
@@ -100,9 +108,21 @@ spec:
       affinity: {{- toYaml . | trim | nindent 8 }}
       {{- end }}
       volumes:
-        - name: broker-config
+        - name: config
           configMap:
-            name: {{ printf "%s-broker" (include "mosquitto.fullname" .) }}
+            name: {{ template "mosquitto.fullname" . }}
+        - name: data
+          {{- if .Values.mosquitto.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ template "mosquitto.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if or .Values.mosquitto.authentication.passwordFile .Values.mosquitto.authorization.aclFile }}
+        - name: secret-config
+          secret:
+            secretName: {{ template "mosquitto.fullname" . }}
+        {{- end }}
         {{- with .Values.mosquitto.pod.volumes }}
         {{- toYaml . | trim | nindent 8 }}
         {{- end }}

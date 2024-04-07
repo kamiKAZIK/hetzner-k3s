@@ -343,6 +343,37 @@ mosquitto:
     ##
     annotations: {}
 
+  ## Persistent volume claim settings
+  ##
+  persistentVolumeClaim:
+    ## Labels to be added to the persistent volume claim.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+    ##
+    labels: {}
+
+    ## Annotations for the persistent volume claim.
+    ##
+    ## Example:
+    ##   key1: "value1"
+    ##   key2: "value2"
+    ##
+    ## Ref: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+    ##
+    annotations: {}
+
+    ## Persistent volume claim access mode
+    ##
+    accessMode: ReadWriteOnce
+
+    ## Persistent volume claim access mode
+    ##
+    size: 1Gi
+
   ## Mosquitto image to use in api server container(s).
   ##
   image: mosquitto
@@ -366,12 +397,19 @@ mosquitto:
   ports:
     ## MQTT port
     ##
-    - port: 1883
-      name: mqtt
-      protocol: TCP
+    mqtt: 1883
+
+    ## MQTTS port
+    ##
+    mqtts: 8883
 
     ## WebSocket port
     ##
-    - port: 9090
-      name: websocket
-      protocol: TCP
+    websocket: 9090
+
+  ## Security context configuration for pod(s)
+  ##
+  securityContext:
+    ## File System group ID
+    ##
+    fsGroup: 999

@@ -12,11 +12,11 @@ metadata:
   {{- if or .Values.mosquitto.common.annotations .Values.mosquitto.podDisruptionBudget.annotations }}
   annotations:
     {{- with .Values.mosquitto.common.annotations }}
-      {{- toYaml . | trim | nindent 4 }}
-      {{- end }}
-      {{- with .Values.mosquitto.podDisruptionBudget.annotations }}
-      {{- toYaml . | trim | nindent 4 }}
-      {{- end }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
+    {{- with .Values.mosquitto.podDisruptionBudget.annotations }}
+    {{- toYaml . | trim | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   minAvailable: {{ required ".Values.mosquitto.podDisruptionBudget.minAvailable is required!" .Values.mosquitto.podDisruptionBudget.minAvailable }}
