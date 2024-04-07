@@ -11,20 +11,15 @@ provider "hcloud" {
   token = var.hcloud_token
 }
 
-locals {
-  master_count = 1
-  worker_count = 0
-}
-
-data "template_cloudinit_config" "master_init" {
+data "cloudinit_config" "master_init" {
   gzip          = false
   base64_encode = true
 
   part {
-    filename     = "init.cfg"
+    filename     = "cloud-config.yaml"
     content_type = "text/cloud-config"
     content      = templatefile(
-      "cloud-init-master.yaml.tftpl",
+      "${path.module}/cloud-init-master.yaml.tftpl",
       {
         hcloud_token = var.hcloud_token
         k3s_token    = var.k3s_token
@@ -33,15 +28,15 @@ data "template_cloudinit_config" "master_init" {
   }
 }
 
-data "template_cloudinit_config" "worker_init" {
+data "cloudinit_config" "worker_init" {
   gzip          = false
   base64_encode = true
 
   part {
-    filename     = "init.cfg"
+    filename     = "cloud-config.yaml"
     content_type = "text/cloud-config"
     content      = templatefile(
-      "cloud-init-worker.yaml.tftpl",
+      "${path.module}/cloud-init-worker.yaml.tftpl",
       {
         k3s_token = var.k3s_token
       }
@@ -171,7 +166,7 @@ resource "hcloud_placement_group" "kubernetes_placement_group" {
 }
 
 resource "hcloud_server" "master_nodes" {
-  count                      = local.master_count
+  count                      = var.master_count
   name                       = "master-node-${count.index}"
   image                      = "ubuntu-22.04"
   server_type                = "cax11"
@@ -192,7 +187,7 @@ resource "hcloud_server" "master_nodes" {
   network {
     network_id = hcloud_network.kubernetes_network.id
   }
-  user_data = data.template_cloudinit_config.master_init.rendered
+  user_data = data.template_cloudinit_config.master_init.content
   depends_on = [
     hcloud_network_subnet.kubernetes_network_subnet,
     hcloud_placement_group.kubernetes_placement_group
@@ -200,7 +195,7 @@ resource "hcloud_server" "master_nodes" {
 }
 
 resource "hcloud_server" "worker_nodes" {
-  count                      = local.worker_count
+  count                      = var.worker_count
   name                       = "worker-node-${count.index}"
   image                      = "ubuntu-22.04"
   server_type                = "cax11"
@@ -221,7 +216,7 @@ resource "hcloud_server" "worker_nodes" {
   network {
     network_id = hcloud_network.kubernetes_network.id
   }
-  user_data = data.template_cloudinit_config.master_init.rendered
+  user_data = data.template_cloudinit_config.master_init.content
   depends_on = [
     hcloud_network_subnet.kubernetes_network_subnet,
     hcloud_placement_group.kubernetes_placement_group,

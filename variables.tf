@@ -1,3 +1,11 @@
+variable "master_count" {
+  default = 1
+}
+
+variable "worker_count" {
+  default = 0
+}
+
 variable "enable_ipv4" {
   default = true
 }

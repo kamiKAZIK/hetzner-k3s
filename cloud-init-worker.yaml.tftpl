@@ -1,13 +1,17 @@
 #cloud-config
 packages:
   - curl
-  - apparmor
-  - apparmor-utils
 package_update: true
 package_upgrade: true
 runcmd:
   - |
-    curl -sfL https://get.k3s.io | K3S_URL=https://10.0.0.2:6443 K3S_TOKEN=${k3s_token} sh -s - agent \
-        --node-name="$(hostname -f)" \
+    HOSTNAME=$(hostname -f)
+    PRIVATE_IP=$(ip route get 10.1.0.1 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
+    PUBLIC_IP=$(hostname -I | awk '{print $1}')
+    NETWORK_INTERFACE=$(ip route get 10.1.0.1 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}')
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.28.7+k3s1" K3S_URL=https://10.1.0.2:6443 K3S_TOKEN=${k3s_token} sh -s - agent \
+        --node-name=$HOSTNAME \
+        --node-ip=$PRIVATE_IP \
+        --node-external-ip=$PUBLIC_IP \
         --kubelet-arg="cloud-provider=external" \
-        --flannel-iface=enp7s0
+        --flannel-iface=$NETWORK_INTERFACE
