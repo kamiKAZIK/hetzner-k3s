@@ -1,6 +1,8 @@
-helm repo add scylla https://scylla-operator-charts.storage.googleapis.com/stable
-
-kubectl apply -f examples/common/cert-manager.yaml
-helm install scylla-operator scylla/scylla-operator --create-namespace --namespace scylla-operator
-helm install scylla-manager scylla/scylla-manager --create-namespace --namespace scylla-manager
-helm install scylla scylla/scylla --create-namespace --namespace scylla
+cat <<EOF > postgresql.yaml
+auth:
+  username:
+  password:
+  database: refinery
+EOF
+helm install postgres oci://registry-1.docker.io/bitnamicharts/postgresql --values postgresql.yaml
+tm postgresql.yaml
