@@ -9,7 +9,7 @@ runcmd:
     PRIVATE_IP=$(ip route get 10.1.0.1 | awk -F"src " 'NR==1{split($2,a," ");print a[1]}')
     PUBLIC_IP=$(hostname -I | awk '{print $1}')
     NETWORK_INTERFACE=$(ip route get 10.1.0.1 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}')
-    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.28.7+k3s1" sh -s - agent \
+    curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.30.1+k3s1" sh -s - agent \
         --server https://10.1.0.2:6443 \
         --node-name=$HOSTNAME \
         --node-ip=$PRIVATE_IP \
